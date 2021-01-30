@@ -1,0 +1,193 @@
+/* Anastasios Chroneas 3140229
+   Grigorios Tsitsanos 3160182
+   Panagiotis Lambropoulos 3050085 */
+Package minipython;
+
+Helpers
+	digit = ['0' .. '9'];
+	letter = ['a' .. 'z']|['A' .. 'Z'];
+	double_quote='"';
+	single_quote=''';
+	underscore='_';
+	space=' ';
+	cr = 13;
+	lf = 10;
+	all = [0..127];
+	eol = lf | cr | cr lf ;
+	not_eol = [all - [cr + lf]];
+
+
+Tokens
+    tab = 9;
+    def='def';
+    left_par='(';
+    right_par=')';
+    semi=':';
+    comma=',';
+    if='if';
+    fullstop='.';
+    while='while';
+    for='for';
+    in='in';
+    return='return';
+    print='print';
+    set='=';
+    fast_sub='-=';
+    fast_div='/=';
+    left_bracket='[';
+    right_bracket=']';
+    assert='assert';
+    plus='+';
+    minus='-';
+    mult='*';
+    dmult='**';
+    div='/';
+    mod='%';
+    max='max';
+    min='min';
+    open='open';
+    type='type';
+    and='and';
+    or='or';
+    not='not';
+    less='<';
+    greater='>';
+    not_equal='!=';
+    equal='==';
+    true='true';
+    false='false';
+    greater_or_equal='=>';
+    less_or_equal='<=';
+	null='None';
+	blank = (space|eol);
+	line_comment = '#' not_eol* eol;
+	id = (underscore | letter) (underscore | letter | digit)*;
+	string= (single_quote not_eol* single_quote) | (double_quote not_eol* double_quote);
+	number = digit+;
+
+Ignored Tokens
+
+	blank, line_comment;
+
+Productions
+
+    goal = commands*;
+    commands={function}function|{statement}statement;
+    function=def id left_par argument? right_par semi statement;
+    argument=id set_value? next_arg* ;
+    set_value= set value;
+    next_arg= comma id set_value?;
+
+    statement={if} tab* if comparison_first_priority semi statement |
+              {while} tab* while comparison_first_priority semi statement |
+              {for} tab* for [first_id]:id in [second_id]:id semi statement|
+              {return} tab* return expression_first_priority|
+              {print} tab* print expression_first_priority next_expression*|
+              {equal} tab* id set expression_first_priority|
+              {min_equal} tab* id fast_sub expression_first_priority|
+              {div_equal} tab* id fast_div expression_first_priority|
+              {array_equal} tab* id left_bracket [first_expression]:expression_first_priority right_bracket set [second_expression]:expression_first_priority|
+              {assert} tab* assert expression_first_priority next_expression?|
+              {function_call} tab* function_call;
+
+
+
+
+      comparison_first_priority={second_priority}comparison_second_priority|
+                                {not}not comparison_second_priority;
+
+      comparison_second_priority={third_priority}comparison_third_priority|
+                                {and}comparison_second_priority and comparison_third_priority;
+
+      comparison_third_priority={fourth_priority}comparison_fourth_priority|
+                                {or}comparison_third_priority or comparison_fourth_priority;
+
+      comparison_fourth_priority= {third_priority}comparison_terminal_priority|
+                                  {greater}[first_expression]:expression_first_priority greater [second_expression]:expression_first_priority|
+                                  {less}[first_expression]:expression_first_priority less [second_expression]:expression_first_priority|
+                                  {equal}[first_expression]:expression_first_priority equal [second_expression]:expression_first_priority|
+                                  {greater_or_equal}[first_expression]:expression_first_priority greater_or_equal [second_expression]:expression_first_priority|
+                                  {greater_or_less}[first_expression]:expression_first_priority less_or_equal [second_expression]:expression_first_priority|
+                                  {not_equal}[first_expression]:expression_first_priority not_equal [second_expression]:expression_first_priority;
+
+        comparison_terminal_priority={true}true|
+                                     {false}false;
+
+
+
+/*    comparison_first_priority={second_priority}comparison_second_priority|
+                              {and} comparison_first_priority and comparison_second_priority|
+                              {or}  comparison_first_priority or comparison_second_priority;
+
+    comparison_second_priority={third_priority}comparison_third_priority|
+                               {greater}[first_expression]:expression_first_priority greater [second_expression]:expression_first_priority|
+                               {less}[first_expression]:expression_first_priority less [second_expression]:expression_first_priority|
+                               {equal}[first_expression]:expression_first_priority equal [second_expression]:expression_first_priority|
+                               {greater_or_equal}[first_expression]:expression_first_priority greater_or_equal [second_expression]:expression_first_priority|
+                               {greater_or_less}[first_expression]:expression_first_priority less_or_equal [second_expression]:expression_first_priority|
+                               {not_equal}[first_expression]:expression_first_priority not_equal [second_expression]:expression_first_priority;
+
+   comparison_third_priority={fourth_priority}comparison_fourth_priority|
+                             {not}not comparison_fourth_priority;
+
+   comparison_fourth_priority={true}true|
+                              {false}false; */
+
+   expression_first_priority={mult_div_mod_power} expression_second_priority|
+                              {add} expression_first_priority plus expression_second_priority|
+                              {sub} expression_first_priority minus expression_second_priority;
+
+   expression_second_priority={expression_third_priority} expression_third_priority|
+                              {multiply} expression_second_priority mult expression_third_priority|
+                              {divide} expression_second_priority div expression_third_priority|
+                              {mod} expression_second_priority mod expression_third_priority|
+                              {power} expression_second_priority dmult expression_third_priority;
+
+   id_xpr={id} id|
+          {array_id} id left_bracket expression_first_priority right_bracket;
+
+   expression_third_priority={function_call} function_call|
+                             {id} id_xpr|
+                             {value} value|
+                             {open} open left_par [first_expression]:expression_first_priority comma [second_expression]:expression_first_priority right_par|
+                             {type} type left_par id right_par|
+                             {max} max left_par value more_values+ right_par|
+                             {min} min left_par value more_values+ right_par|
+                             {par_exp} left_par expression_first_priority right_par|
+                             {bracket_exp} left_bracket expression_first_priority next_expression* right_bracket;
+
+   next_expression={next}comma expression_first_priority;
+
+   function_call={function_call}id left_par expression_first_priority next_expression* right_par;
+
+   more_values={more} comma value;
+
+   value = {id} id fullstop function_call|
+           {number} number|
+           {string} string|
+           {none} null;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

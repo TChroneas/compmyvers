@@ -1,0 +1,299 @@
+/* Anastasios Chroneas 3140229
+   Grigorios Tsitsanos 3160182
+   Panagiotis Lambropoulos 3050085 */
+Package minipython;
+
+Helpers
+	digit = ['0' .. '9'];
+	letter = ['a' .. 'z']|['A' .. 'Z'];
+	double_quote='"';
+	single_quote=''';
+	underscore='_';
+	space=' ';
+	cr = 13;
+	lf = 10;
+	all = [0..127];
+	eol = lf | cr | cr lf ;
+	not_eol = [all - [cr + lf]];
+
+
+Tokens
+    tab = 9;
+    def='def';
+    left_par='(';
+    right_par=')';
+    semi=':';
+    comma=',';
+    if='if';
+    fullstop='.';
+    while='while';
+    for='for';
+    in='in';
+    return='return';
+    print='print';
+    set='=';
+    fast_sub='-=';
+    fast_div='/=';
+    left_bracket='[';
+    right_bracket=']';
+    assert='assert';
+    plus='+';
+    minus='-';
+    mult='*';
+    dmult='**';
+    div='/';
+    mod='%';
+    max='max';
+    min='min';
+    open='open';
+    type='type';
+    and='and';
+    or='or';
+    not='not';
+    less='<';
+    greater='>';
+    not_equal='!=';
+    equal='==';
+    true='true';
+    false='false';
+    greater_or_equal='=>';
+    less_or_equal='<=';
+	null='None';
+	blank = (space|eol);
+	line_comment = '#' not_eol* eol;
+	id = (underscore | letter) (underscore | letter | digit)*;
+	string= (single_quote (letter|digit|space)* single_quote) | (double_quote (letter|digit|space)* double_quote);
+	number = digit+;
+
+Ignored Tokens
+
+	blank, line_comment;
+
+Productions
+
+    goal = commands*{->New goal([commands])};
+    commands={function}function{->New commands.function(function)}|{statement}statement{->New commands.statement(statement)};
+    function=def id left_par argument? right_par semi statement{->New function(id,argument,statement)};
+    argument=id set_value? next_arg*{->New argument(id,set_value,[next_arg])} ;
+    set_value= set value{->New set_value(value)};
+    next_arg= comma id set_value?{->New next_arg(id,set_value)};
+
+    statement={if} tab* if comparison_first_priority semi statement
+              {->New statement.if(comparison_first_priority.comparison,statement)}|
+              {while} tab* while comparison_first_priority semi statement
+              {->New statement.while(comparison_first_priority.comparison,statement)}|
+              {for} tab* for [first_id]:id in [second_id]:id semi statement
+              {->New statement.for(first_id,second_id,statement)}|
+              {return} tab* return expression_first_priority
+              {->New statement.return(expression_first_priority.expression)}|
+              {print} tab* print expression_first_priority next_expression*
+              {->New statement.print(expression_first_priority.expression,[next_expression])}|
+              {equal} tab* id set expression_first_priority
+              {->New statement.equal(id,expression_first_priority.expression)}|
+              {min_equal} tab* id fast_sub expression_first_priority
+              {->New statement.min_equal(id,expression_first_priority.expression)}|
+              {div_equal} tab* id fast_div expression_first_priority
+              {->New statement.div_equal(id,expression_first_priority.expression)}|
+              {array_equal} tab* id left_bracket [first_expression]:expression_first_priority right_bracket set [second_expression]:expression_first_priority
+              {->New statement.array_equal(id,first_expression.expression,second_expression.expression)}|
+              {assert} tab* assert expression_first_priority next_expression?
+              {->New statement.assert(expression_first_priority.expression,next_expression)}|
+              {function_call} tab* function_call
+              {->New statement.function_call(function_call)};
+
+
+
+
+      comparison_first_priority{->comparison}={second_priority}comparison_second_priority
+                                              {->comparison_second_priority.comparison}|
+                                              {not}not comparison_second_priority
+                                              {->New comparison.not(comparison_second_priority.comparison)};
+
+      comparison_second_priority{->comparison}={third_priority}comparison_third_priority
+                                               {->comparison_third_priority.comparison}|
+                                               {and}comparison_second_priority and comparison_third_priority
+                                               {->New comparison.and(comparison_second_priority.comparison,comparison_third_priority.comparison)};
+
+      comparison_third_priority{->comparison}={fourth_priority}comparison_fourth_priority
+                                              {->comparison_fourth_priority.comparison}|
+                                              {or}comparison_third_priority or comparison_fourth_priority
+                                              {->New comparison.or(comparison_third_priority.comparison,comparison_fourth_priority.comparison)};
+
+      comparison_fourth_priority{->comparison}={third_priority}comparison_terminal_priority
+                                               {->comparison_terminal_priority.comparison}|
+                                               {greater}[first_expression]:expression_first_priority greater [second_expression]:expression_first_priority
+                                               {->New comparison.greater(first_expression.expression,second_expression.expression)}|
+                                               {less}[first_expression]:expression_first_priority less [second_expression]:expression_first_priority
+                                               {->New comparison.less(first_expression.expression,second_expression.expression)}|
+                                               {equal}[first_expression]:expression_first_priority equal [second_expression]:expression_first_priority
+                                               {->New comparison.equals(first_expression.expression,second_expression.expression)}|
+                                               {greater_or_equal}[first_expression]:expression_first_priority greater_or_equal [second_expression]:expression_first_priority
+                                               {->New comparison.greater_or_equal(first_expression.expression,second_expression.expression)}|
+                                               {less_or_equal}[first_expression]:expression_first_priority less_or_equal [second_expression]:expression_first_priority
+                                               {->New comparison.less_or_equal(first_expression.expression,second_expression.expression)}|
+                                               {not_equal}[first_expression]:expression_first_priority not_equal [second_expression]:expression_first_priority
+                                               {->New comparison.not_equals(first_expression.expression,second_expression.expression)};
+
+      comparison_terminal_priority{->comparison}={true}true
+                                                 {->New comparison.true(true)}|
+                                                 {false}false
+                                                 {->New comparison.false(false)};
+
+
+
+
+      expression_first_priority{->expression}={mult_div_mod_power} expression_second_priority
+                                              {->expression_second_priority.expression}|
+                                              {add} expression_first_priority plus expression_second_priority
+                                              {->New expression.plus(expression_first_priority.expression,expression_second_priority.expression)}|
+                                              {sub} expression_first_priority minus expression_second_priority
+                                              {->New expression.minus(expression_first_priority.expression,expression_second_priority.expression)};
+
+   expression_second_priority{->expression}={expression_third_priority} expression_third_priority
+                                            {->expression_third_priority.expression}|
+                                            {multiply} expression_second_priority mult expression_third_priority
+                                            {->New expression.mult(expression_second_priority.expression,expression_third_priority.expression)}|
+                                            {divide} expression_second_priority div expression_third_priority
+                                            {->New expression.div(expression_second_priority.expression,expression_third_priority.expression)}|
+                                            {mod} expression_second_priority mod expression_third_priority
+                                            {->New expression.mod(expression_second_priority.expression,expression_third_priority.expression)}|
+                                            {power} expression_second_priority dmult expression_third_priority
+                                            {->New expression.dmult(expression_second_priority.expression,expression_third_priority.expression)};
+
+   id_xpr{->expression}={id} id
+                        {->New expression.ident(id)}|
+                        {array_id} id left_bracket expression_first_priority right_bracket
+                        {->New expression.array_id(id,expression_first_priority.expression)};
+
+   expression_third_priority{->expression}={function_call} function_call
+                                           {->New expression.function_call(function_call)}|
+                                           {id} id_xpr
+                                           {->id_xpr.expression}|
+                                           {value} value
+                                           {->New expression.value(value)}|
+                                           {open} open left_par [first_expression]:expression_first_priority comma [second_expression]:expression_first_priority right_par
+                                           {->New expression.open(first_expression.expression,second_expression.expression)}|
+                                           {type} type left_par id right_par
+                                           {->New expression.type(id)}|
+                                           {max} max left_par value more_values+ right_par
+                                           {->New expression.max(value,[more_values])}|
+                                           {min} min left_par value more_values+ right_par
+                                           {->New expression.min(value,[more_values])}|
+                                           {par_exp} left_par expression_first_priority right_par
+                                           {->expression_first_priority.expression}|
+                                           {bracket_exp} left_bracket expression_first_priority next_expression* right_bracket
+                                           {->New expression.array_exp(expression_first_priority.expression,[next_expression])};
+
+   next_expression={next}comma expression_first_priority
+                    {->New next_expression.next(expression_first_priority.expression)};
+
+   function_call={function_call}id left_par arglist? right_par
+                 {->New function_call.function_call(id,arglist)};
+
+   arglist = expression_first_priority next_expression*
+   {->New arglist(expression_first_priority.expression,[next_expression])};
+
+   more_values={more} comma value
+               {->New more_values.more(value)};
+
+   value = {id} id fullstop function_call|
+           {number} number|
+           {string} string|
+           {none} null;
+
+
+
+Abstract Syntax Tree
+
+  goal=commands*;
+  commands={function}function|
+           {statement}statement;
+
+  function=id argument statement;
+
+  argument= id set_value next_arg*;
+
+  set_value=value;
+
+  next_arg=id set_value;
+
+
+  statement={if}comparison statement|
+            {while}comparison statement|
+            {for} [first_id]:id [second_id]:id statement|
+            {return} expression|
+            {print} expression next_expression*|
+            {equal} id expression|
+            {min_equal} id expression|
+            {div_equal} id expression|
+            {array_equal} id [first_expression]:expression [second_expression]:expression|
+            {assert} expression next_expression?|
+            {function_call} function_call;
+
+  comparison={not}comparison|
+             {and}[comp1]:comparison [comp2]:comparison|
+             {or} [comp1]:comparison [comp2]:comparison|
+             {greater} [expr1]:expression [expr2]:expression|
+             {less}  [expr1]:expression [expr2]:expression|
+             {equals} [expr1]:expression [expr2]:expression|
+             {greater_or_equal} [expr1]:expression [expr2]:expression|
+             {less_or_equal} [expr1]:expression [expr2]:expression|
+             {not_equals} [expr1]:expression [expr2]:expression|
+             {true} true|
+             {false} false;
+
+  expression={plus}[expr1]:expression [expr2]:expression|
+             {minus}[expr1]:expression [expr2]:expression|
+             {mult} [expr1]:expression [expr2]:expression|
+             {div} [expr1]:expression [expr2]:expression|
+             {mod} [expr1]:expression [expr2]:expression|
+             {dmult} [expr1]:expression [expr2]:expression|
+             {ident} id|
+             {array_id} id expression|
+             {function_call} function_call|
+             {value} value|
+             {open} [expr1]:expression [expr2]:expression|
+             {type} id|
+             {max} value more_values*|
+             {min} value more_values*|
+             {array_exp} expression next_expression*;
+
+  next_expression={next} expression;
+  arglist= expression next_expression*;
+  function_call={function_call} id arglist;
+  more_values={more} value;
+
+  value = {id} id fullstop function_call|
+             {number} number|
+             {string} string|
+             {none} null;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
